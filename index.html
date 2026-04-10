@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-Pulse AI 翻譯機</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; background-color: #f8f9fa; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #result { margin-top: 20px; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 8px; white-space: pre-wrap; min-height: 100px; }
+        .loading { color: #007bff; font-weight: bold; }
+        input[type="file"] { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🚀 K-Pulse 韓流翻譯機</h1>
+        <p>請上傳圖片，AI 將自動辨識韓文並解釋內容：</p>
+        
+        <input type="file" id="imageInput" accept="image/*">
+        
+        <div id="result">等待上傳圖片中...</div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const resultDiv = document.getElementById('result');
+
+        // ⚠️ 這裡貼上你剛剛在 Google Cloud 申請到的 API Key
+        const API_KEY = 'AIzaSyBgYFXDa6AC7gkGqcpdOvfE6Ct5fyBH56Q'; 
+
+        imageInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            resultDiv.innerHTML = '<p class="loading">🔍 正在進行圖片辨識 (OCR)...</p>';
+
+            try {
+                // 1. OCR 辨識
+                const { data: { text } } = await Tesseract.recognize(file, 'kor+eng');
+                
+                if (!text.trim()) {
+                    resultDiv.innerHTML = "❌ 無法辨識文字，請換一張清晰的圖片。";
+                    return;
+                }
+
+                resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 AI 正在解讀中...</p>`;
+
+                // 2. 呼叫 Gemini API
+                const geminiResponse = await callGemini(text);
+                resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<hr><strong>✨ AI 懂梗翻譯：</strong>\n${geminiResponse}`;
+
+            } catch (error) {
+                resultDiv.innerHTML = "❌ 發生錯誤：" + error.message;
+            }
+        };
+
+        async function callGemini(text) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: `你是一位韓流社群專家，請將以下韓文內容翻譯成繁體中文，並解釋其中是否有特定的網路梗或 K-pop 相關背景：\n\n${text}` }]
+                    }]
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+            return data.candidates[0].content.parts[0].text;
+        }
+    </script>
+</body>
+</html>
