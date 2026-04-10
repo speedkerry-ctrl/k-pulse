@@ -3,57 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K-Pulse AI 翻譯機 v2.5</title>
+    <title>K-Pulse AI v2.5</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; background-color: #f0f2f5; }
+        body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; background-color: #f0f2f5; }
         .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-        #drop-area {
-            border: 2px dashed #007bff; border-radius: 12px; padding: 40px;
-            text-align: center; background: #f8fbff; cursor: pointer; transition: 0.3s; margin-bottom: 20px;
-        }
-        #drop-area.highlight { background: #e1efff; border-color: #0056b3; }
-        #result { margin-top: 20px; padding: 20px; background: #fff; border: 1px solid #eee; border-radius: 12px; white-space: pre-wrap; min-height: 150px; line-height: 1.6; }
+        #drop-area { border: 2px dashed #007bff; border-radius: 12px; padding: 40px; text-align: center; background: #f8fbff; cursor: pointer; margin-bottom: 20px; }
+        #result { margin-top: 20px; padding: 20px; background: #fff; border: 1px solid #eee; border-radius: 12px; white-space: pre-wrap; line-height: 1.6; }
         .loading { color: #007bff; font-weight: bold; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
         .error-msg { color: #dc3545; background: #fff5f5; padding: 15px; border-radius: 8px; border: 1px solid #ffc1c1; }
-        .debug-panel { margin-top: 15px; font-family: monospace; font-size: 11px; background: #333; color: #fff; padding: 10px; border-radius: 4px; display: none; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h1>🚀 K-Pulse 韓流翻譯機 v2.5</h1>
-    <p>模式：<b>Gemini 1.5 Pro (最新穩定版)</b></p>
+    <h1>🚀 K-Pulse 翻譯機 v2.5</h1>
+    <p>模式：使用 <b>Gemini 2.5 Flash</b> (移植自成功專案)</p>
 
     <div id="drop-area">
-        <p>📸 <b>點擊上傳</b>、<b>拖曳圖片</b> 或 <b>Ctrl+V 貼上</b></p>
+        <p>📸 <b>點擊</b>、<b>拖曳</b> 或 <b>Ctrl+V 貼上</b> 韓星 Bubble 截圖</p>
         <input type="file" id="imageInput" accept="image/*" style="display: none;">
     </div>
 
     <div id="result">等待操作中...</div>
-    <div id="debug-log" class="debug-panel"></div>
 </div>
 
 <script>
     const dropArea = document.getElementById('drop-area');
     const imageInput = document.getElementById('imageInput');
     const resultDiv = document.getElementById('result');
-    const debugLog = document.getElementById('debug-log');
 
-    // ⚠️ 貼上你的 API KEY
-    const API_KEY = 'AIzaSyBgYFXDa6AC7gkGqcpdOvfE6Ct5fyBH56Q'; 
+    // 🔑 直接延用你提供的有效金鑰
+    const GEMINI_API_KEY = "AIzaSyBgYFXDa6AC7gkGqcpdOvfE6Ct5fyBH56Q"; 
 
     dropArea.addEventListener('click', () => imageInput.click());
     imageInput.addEventListener('change', (e) => handleFiles(e.target.files));
-
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
-        dropArea.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
-    });
-
-    ['dragenter', 'dragover'].forEach(ev => dropArea.addEventListener(ev, () => dropArea.classList.add('highlight'), false));
-    ['dragleave', 'drop'].forEach(ev => dropArea.addEventListener(ev, () => dropArea.classList.remove('highlight'), false));
-    dropArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 
     window.addEventListener('paste', (e) => {
         const items = e.clipboardData.items;
@@ -62,54 +47,51 @@
         }
     });
 
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+        dropArea.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+
+    dropArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
+
     function handleFiles(files) { if (files.length > 0) processImage(files[0]); }
 
     async function processImage(file) {
-        resultDiv.innerHTML = '<p class="loading">🔍 正在辨識文字 (OCR)...</p>';
-        debugLog.style.display = 'none';
-
+        resultDiv.innerHTML = '<p class="loading">🔍 正在提取韓文內容...</p>';
         try {
             const { data: { text } } = await Tesseract.recognize(file, 'kor+eng');
             if (!text.trim()) { resultDiv.innerHTML = "❌ 找不到文字。"; return; }
 
-            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 正在使用 Gemini 1.5 Pro 解讀內容...</p>`;
-
+            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 正在調用 Gemini 2.5 Flash...</p>`;
+            
             const response = await callGemini(text);
-            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n<hr><strong>✨ AI 專家翻譯：</strong>\n${response}`;
-
+            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n<hr><strong>✨ AI 懂梗翻譯：</strong>\n${response}`;
         } catch (error) {
-            resultDiv.innerHTML = `<div class="error-msg">❌ 執行出錯：${error.message}</div>`;
+            resultDiv.innerHTML = `<div class="error-msg">❌ 錯誤：${error.message}</div>`;
         }
     }
 
-    async function callGemini(text) {
-        // 關鍵修正：使用你成功過的 1.5 Pro 最新路徑
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent?key=${API_KEY}`;
+    async function callGemini(inputText) {
+        // 完全鎖定你成功的網址規格：v1beta + gemini-2.5-flash
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
         
+        const prompt = `你是一位資深韓流追星專家。請將以下韓文文字翻譯成台灣繁體中文，並解釋其中的專有名詞（如粉絲名）、網路梗或偶像對粉絲的感性背景：\n\n${inputText}`;
+
         try {
-            const res = await fetch(url, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ 
-                        parts: [{ 
-                            text: `你是一位資深韓流專家。請翻譯以下內容（忽略辨識錯誤）為台灣繁體中文，並解釋其中涉及的 K-pop 文化、偶像對粉絲的感性語境或特定名詞（如粉絲名）：\n\n${text}` 
-                        }] 
-                    }]
+                    contents: [{ parts: [{ text: prompt }] }]
                 })
             });
 
-            const data = await res.json();
-
+            const data = await response.json();
             if (data.error) {
-                debugLog.style.display = 'block';
-                debugLog.innerText = "Debug Info: " + JSON.stringify(data.error, null, 2);
-                return `<div class="error-msg">❌ API 拒絕：${data.error.message}</div>`;
+                return `❌ API 拒絕：${data.error.message}`;
             }
-
             return data.candidates[0].content.parts[0].text;
         } catch (e) {
-            return "❌ 連線失敗，請檢查 API Key。";
+            return "❌ 連線失敗，請檢查網路。";
         }
     }
 </script>
