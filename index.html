@@ -3,147 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K-Pulse AI 快速翻譯機</title>
+    <title>K-Pulse AI 翻譯機 v1.3</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; background-color: #f0f2f5; }
         .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-        
-        /* 拖曳與貼上區域樣式 */
         #drop-area {
-            border: 2px dashed #007bff;
-            border-radius: 12px;
-            padding: 40px;
-            text-align: center;
-            background: #f8fbff;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 20px;
+            border: 2px dashed #007bff; border-radius: 12px; padding: 40px;
+            text-align: center; background: #f8fbff; cursor: pointer; transition: 0.3s; margin-bottom: 20px;
         }
         #drop-area.highlight { background: #e1efff; border-color: #0056b3; }
-        
         #result { margin-top: 20px; padding: 20px; background: #fff; border: 1px solid #eee; border-radius: 12px; white-space: pre-wrap; min-height: 150px; line-height: 1.6; }
         .loading { color: #007bff; font-weight: bold; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
-        hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
-        small { color: #666; }
+        .debug-info { margin-top: 10px; font-size: 12px; color: #888; background: #eee; padding: 10px; border-radius: 4px; display: none; }
+        .error-msg { color: #dc3545; background: #fff5f5; padding: 15px; border-radius: 8px; border: 1px solid #ffc1c1; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h1>🚀 K-Pulse 韓流翻譯機</h1>
-    <p>支援：直接貼上截圖 (Ctrl+V) / 拖曳圖片 / 點擊上傳</p>
+    <h1>🚀 K-Pulse 韓流翻譯機 v1.3</h1>
+    <p>狀態：使用 <b>Gemini 1.5 Pro</b> 模型</p>
 
     <div id="drop-area">
-        <p>📸 <b>點擊上傳</b> 或 <b>直接將圖片拖到這裡</b></p>
-        <p><small>也可以直接按下 Ctrl + V 貼上截圖</small></p>
+        <p>📸 <b>點擊上傳</b>、<b>拖曳圖片</b> 或 <b>Ctrl+V 貼上</b></p>
         <input type="file" id="imageInput" accept="image/*" style="display: none;">
     </div>
 
     <div id="result">等待操作中...</div>
+    <div id="debug" class="debug-info"></div>
 </div>
 
 <script>
     const dropArea = document.getElementById('drop-area');
     const imageInput = document.getElementById('imageInput');
     const resultDiv = document.getElementById('result');
+    const debugDiv = document.getElementById('debug');
 
-    // ⚠️ 請在此處填入你的 API KEY
+    // ⚠️ 填入你的 API KEY
     const API_KEY = 'AIzaSyBgYFXDa6AC7gkGqcpdOvfE6Ct5fyBH56Q'; 
 
-    // --- 1. 處理點擊上傳 ---
     dropArea.addEventListener('click', () => imageInput.click());
     imageInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
-    // --- 2. 處理拖曳上傳 ---
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, preventDefaults, false);
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+        dropArea.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
     });
 
-    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+    ['dragenter', 'dragover'].forEach(ev => dropArea.addEventListener(ev, () => dropArea.classList.add('highlight'), false));
+    ['dragleave', 'drop'].forEach(ev => dropArea.addEventListener(ev, () => dropArea.classList.remove('highlight'), false));
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
-    });
+    dropArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
-    });
-
-    dropArea.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        handleFiles(dt.files);
-    });
-
-    // --- 3. 處理 Ctrl + V 貼上 ---
     window.addEventListener('paste', (e) => {
         const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                const blob = items[i].getAsFile();
-                processImage(blob);
-            }
+        for (let item of items) {
+            if (item.type.indexOf('image') !== -1) processImage(item.getAsFile());
         }
     });
 
-    // --- 核心處理邏輯 ---
-    function handleFiles(files) {
-        if (files.length > 0) processImage(files[0]);
-    }
+    function handleFiles(files) { if (files.length > 0) processImage(files[0]); }
 
     async function processImage(file) {
-        resultDiv.innerHTML = '<p class="loading">🔍 正在提取韓文文字 (OCR)...</p>';
+        resultDiv.innerHTML = '<p class="loading">🔍 正在進行圖片辨識 (OCR)...</p>';
+        debugDiv.style.display = 'none';
 
         try {
-            // Tesseract 辨識
             const { data: { text } } = await Tesseract.recognize(file, 'kor+eng');
-            if (!text.trim()) {
-                resultDiv.innerHTML = "❌ 圖片中好像沒有文字，請換一張試試。";
-                return;
-            }
+            if (!text.trim()) { resultDiv.innerHTML = "❌ 偵測不到文字。"; return; }
 
-            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 AI 正在解讀韓流梗...</p>`;
+            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 正在請求 Gemini 1.5 Pro 翻譯...</p>`;
 
-            // 呼叫 Gemini
-            const geminiResponse = await callGemini(text);
-            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n<hr><strong>✨ AI 懂梗翻譯：</strong>\n${geminiResponse}`;
+            const response = await callGemini(text);
+            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n<hr><strong>✨ AI 專業解析：</strong>\n${response}`;
 
         } catch (error) {
-            resultDiv.innerHTML = "❌ 出錯了：" + error.message;
+            resultDiv.innerHTML = `<div class="error-msg">❌ 執行出錯：${error.message}</div>`;
         }
     }
 
-async function callGemini(text) {
-    try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: `你是一位韓流社群專家，請將以下韓文內容翻譯成繁體中文，並解釋其中是否有特定的網路梗、迷因或 K-pop 相關背景：\n\n${text}` }] }]
-            })
-        });
+    async function callGemini(text) {
+        // 使用 v1beta 配合 1.5-pro 是目前最穩定的官方路徑
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${API_KEY}`;
+        
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `你是一位韓流專家。請翻譯這段文字（忽略辨識雜訊）並解釋其中的 K-pop 梗、粉絲名或背景資訊：\n\n${text}` }] }]
+                })
+            });
 
-        const data = await response.json();
+            const data = await res.json();
 
-        // --- 新增：錯誤檢查邏輯 ---
-        if (data.error) {
-            console.error("API 錯誤詳情:", data.error);
-            return `❌ API 錯誤：${data.error.message}\n(提示：請檢查 API Key 是否正確，或 Google Cloud 的網域限制是否已儲存)`;
+            if (data.error) {
+                debugDiv.style.display = 'block';
+                debugDiv.innerText = "Debug Info: " + JSON.stringify(data.error, null, 2);
+                return `<div class="error-msg">❌ API 報錯：${data.error.message}</div>`;
+            }
+
+            return data.candidates[0].content.parts[0].text;
+        } catch (e) {
+            return "❌ 網路請求失敗，請確認 API Key 與網域限制。";
         }
-
-        if (!data.candidates || data.candidates.length === 0) {
-            console.error("回傳資料異常:", data);
-            return "❌ AI 沒有回傳結果，可能是內容被過濾器擋下了。";
-        }
-
-        return data.candidates[0].content.parts[0].text;
-    } catch (e) {
-        console.error("網路請求失敗:", e);
-        return "❌ 網路請求失敗，請檢查網路連線或 API 設定。";
     }
-}
 </script>
 
 </body>
