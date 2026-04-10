@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K-Pulse AI 翻譯機 v1.3</title>
+    <title>K-Pulse AI 翻譯機 v1.4</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; background-color: #f0f2f5; }
@@ -16,32 +16,32 @@
         #result { margin-top: 20px; padding: 20px; background: #fff; border: 1px solid #eee; border-radius: 12px; white-space: pre-wrap; min-height: 150px; line-height: 1.6; }
         .loading { color: #007bff; font-weight: bold; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
-        .debug-info { margin-top: 10px; font-size: 12px; color: #888; background: #eee; padding: 10px; border-radius: 4px; display: none; }
         .error-msg { color: #dc3545; background: #fff5f5; padding: 15px; border-radius: 8px; border: 1px solid #ffc1c1; }
+        .debug-panel { margin-top: 15px; font-family: monospace; font-size: 11px; background: #333; color: #fff; padding: 10px; border-radius: 4px; display: none; overflow-x: auto; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h1>🚀 K-Pulse 韓流翻譯機 v1.3</h1>
-    <p>狀態：使用 <b>Gemini 1.5 Pro</b> 模型</p>
+    <h1>🚀 K-Pulse 韓流翻譯機 v1.4</h1>
+    <p>模式：<b>穩定相容模式 (Gemini Pro)</b></p>
 
     <div id="drop-area">
-        <p>📸 <b>點擊上傳</b>、<b>拖曳圖片</b> 或 <b>Ctrl+V 貼上</b></p>
+        <p>📸 點擊、拖曳或 <b>Ctrl+V 貼上截圖</b></p>
         <input type="file" id="imageInput" accept="image/*" style="display: none;">
     </div>
 
     <div id="result">等待操作中...</div>
-    <div id="debug" class="debug-info"></div>
+    <div id="debug-log" class="debug-panel"></div>
 </div>
 
 <script>
     const dropArea = document.getElementById('drop-area');
     const imageInput = document.getElementById('imageInput');
     const resultDiv = document.getElementById('result');
-    const debugDiv = document.getElementById('debug');
+    const debugLog = document.getElementById('debug-log');
 
-    // ⚠️ 填入你的 API KEY
+    // ⚠️ 貼上你的 API KEY
     const API_KEY = 'AIzaSyBgYFXDa6AC7gkGqcpdOvfE6Ct5fyBH56Q'; 
 
     dropArea.addEventListener('click', () => imageInput.click());
@@ -53,7 +53,6 @@
 
     ['dragenter', 'dragover'].forEach(ev => dropArea.addEventListener(ev, () => dropArea.classList.add('highlight'), false));
     ['dragleave', 'drop'].forEach(ev => dropArea.addEventListener(ev, () => dropArea.classList.remove('highlight'), false));
-
     dropArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 
     window.addEventListener('paste', (e) => {
@@ -66,47 +65,46 @@
     function handleFiles(files) { if (files.length > 0) processImage(files[0]); }
 
     async function processImage(file) {
-        resultDiv.innerHTML = '<p class="loading">🔍 正在進行圖片辨識 (OCR)...</p>';
-        debugDiv.style.display = 'none';
+        resultDiv.innerHTML = '<p class="loading">🔍 正在辨識韓文 (OCR)...</p>';
+        debugLog.style.display = 'none';
 
         try {
             const { data: { text } } = await Tesseract.recognize(file, 'kor+eng');
-            if (!text.trim()) { resultDiv.innerHTML = "❌ 偵測不到文字。"; return; }
+            if (!text.trim()) { resultDiv.innerHTML = "❌ 找不到文字。"; return; }
 
-            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 正在請求 Gemini 1.5 Pro 翻譯...</p>`;
-
+            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 AI 正在解釋中...</p>`;
             const response = await callGemini(text);
-            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n<hr><strong>✨ AI 專業解析：</strong>\n${response}`;
+            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n<hr><strong>✨ AI 懂梗翻譯：</strong>\n${response}`;
 
         } catch (error) {
-            resultDiv.innerHTML = `<div class="error-msg">❌ 執行出錯：${error.message}</div>`;
+            resultDiv.innerHTML = `<div class="error-msg">❌ 系統錯誤：${error.message}</div>`;
         }
     }
 
     async function callGemini(text) {
-        // 使用 v1beta 配合 1.5-pro 是目前最穩定的官方路徑
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${API_KEY}`;
+        // 使用最基礎且穩定的 v1 接口與 gemini-pro 名稱
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`;
         
         try {
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: `你是一位韓流專家。請翻譯這段文字（忽略辨識雜訊）並解釋其中的 K-pop 梗、粉絲名或背景資訊：\n\n${text}` }] }]
+                    contents: [{ parts: [{ text: `你是一位韓流專家。請翻譯這段文字（忽略雜訊）並解釋其中的韓流梗、粉絲名或背景：\n\n${text}` }] }]
                 })
             });
 
             const data = await res.json();
 
             if (data.error) {
-                debugDiv.style.display = 'block';
-                debugDiv.innerText = "Debug Info: " + JSON.stringify(data.error, null, 2);
-                return `<div class="error-msg">❌ API 報錯：${data.error.message}</div>`;
+                debugLog.style.display = 'block';
+                debugLog.innerText = "Error Data: " + JSON.stringify(data, null, 2);
+                return `<div class="error-msg">❌ API 拒絕請求：${data.error.message}</div>`;
             }
 
             return data.candidates[0].content.parts[0].text;
         } catch (e) {
-            return "❌ 網路請求失敗，請確認 API Key 與網域限制。";
+            return "❌ 網路連線失敗。";
         }
     }
 </script>
