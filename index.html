@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K-Pulse AI v2.5</title>
+    <title>K-Pulse AI v2.6</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; background-color: #f0f2f5; }
@@ -18,8 +18,8 @@
 <body>
 
 <div class="card">
-    <h1>🚀 K-Pulse 翻譯機 v2.5</h1>
-    <p>模式：使用 <b>Gemini 2.5 Flash</b> (移植自成功專案)</p>
+    <h1>🚀 K-Pulse 翻譯機 v2.6</h1>
+    <p>模式：<b>Gemini 2.5 Flash</b> (已修正 API 安全性與路徑)</p>
 
     <div id="drop-area">
         <p>📸 <b>點擊</b>、<b>拖曳</b> 或 <b>Ctrl+V 貼上</b> 韓星 Bubble 截圖</p>
@@ -34,8 +34,8 @@
     const imageInput = document.getElementById('imageInput');
     const resultDiv = document.getElementById('result');
 
-    // 🔑 直接延用你提供的有效金鑰
-    const GEMINI_API_KEY = "AIzaSyBgYFXDa6AC7gkGqcpdOvfE6Ct5fyBH56Q"; 
+    // 🔑 請填入你「新產生的」API Key
+    const GEMINI_API_KEY = "AIzaSyCw857nayOeayK490lQlAbiDE6QsH4LoqY"; 
 
     dropArea.addEventListener('click', () => imageInput.click());
     imageInput.addEventListener('change', (e) => handleFiles(e.target.files));
@@ -56,12 +56,12 @@
     function handleFiles(files) { if (files.length > 0) processImage(files[0]); }
 
     async function processImage(file) {
-        resultDiv.innerHTML = '<p class="loading">🔍 正在提取韓文內容...</p>';
+        resultDiv.innerHTML = '<p class="loading">🔍 正在提取韓文內容 (OCR)...</p>';
         try {
             const { data: { text } } = await Tesseract.recognize(file, 'kor+eng');
             if (!text.trim()) { resultDiv.innerHTML = "❌ 找不到文字。"; return; }
 
-            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 正在調用 Gemini 2.5 Flash...</p>`;
+            resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n\n<p class="loading">🤖 正在調用 Gemini 2.5 Flash 解析語境...</p>`;
             
             const response = await callGemini(text);
             resultDiv.innerHTML = `<strong>辨識結果：</strong>\n${text}\n<hr><strong>✨ AI 懂梗翻譯：</strong>\n${response}`;
@@ -71,10 +71,16 @@
     }
 
     async function callGemini(inputText) {
-        // 完全鎖定你成功的網址規格：v1beta + gemini-2.5-flash
+        // 延用你成功的 v1beta + gemini-2.5-flash 路徑
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
         
-        const prompt = `你是一位資深韓流追星專家。請將以下韓文文字翻譯成台灣繁體中文，並解釋其中的專有名詞（如粉絲名）、網路梗或偶像對粉絲的感性背景：\n\n${inputText}`;
+        const prompt = `你是一位資深韓流追星專家。請將以下韓文文字（可能包含 OCR 雜訊）翻譯成道地的台灣繁體中文。
+        
+        請注意：
+        1. 這是偶像與粉絲的對話，請保持親切感。
+        2. 解釋其中的專有名詞（如粉絲名）、網路梗、或偶像的感性背景。
+        
+        內容：\n\n${inputText}`;
 
         try {
             const response = await fetch(url, {
@@ -87,11 +93,11 @@
 
             const data = await response.json();
             if (data.error) {
-                return `❌ API 拒絕：${data.error.message}`;
+                return `❌ API 拒絕：${data.error.message}\n(提示：若顯示外洩錯誤，請更換新金鑰並確認網站限制設定)`;
             }
             return data.candidates[0].content.parts[0].text;
         } catch (e) {
-            return "❌ 連線失敗，請檢查網路。";
+            return "❌ 連線失敗，請確認網路或 API 設定。";
         }
     }
 </script>
